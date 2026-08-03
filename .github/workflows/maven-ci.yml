@@ -21,7 +21,6 @@ jobs:
           - 3306:3306
         options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=5
 
-    # Variables de entorno para la aplicación y los tests (usando el usuario CI dedicado)
     env:
       DB_HOST: 127.0.0.1
       DB_PORT: 3306
@@ -43,49 +42,62 @@ jobs:
       - name: Instalar cliente de MySQL
         run: sudo apt-get update && sudo apt-get install -y default-mysql-client
 
-      - name: "Esperar a que MySQL esté listo (host: mysql)"
+      - name: "Esperar y preparar MySQL (multi-host, usuario CI e importación)"
         run: |
-          for i in {1..90}; do
-            if mysql -hmysql -P3306 -uroot -p"0404" -e "SELECT 1" >/dev/null 2>&1; then
-              echo "MySQL está listo"
-              break
-            fi
-            echo "Intento $i/90: MySQL todavía se está configurando internamente..."
-            sleep 2
-          done
+          set -euo pipefail
 
-          if ! mysql -hmysql -P3306 -uroot -p"0404" -e "SELECT 1" >/dev/null 2>&1; then
-            echo "Error: MySQL no respondió a tiempo."
-            echo "== Estado mysql.user y versión =="
-            mysql -hmysql -P3306 -uroot -p"0404" -e "SELECT USER(), CURRENT_USER(), @@version; SELECT User, Host, plugin FROM mysql.user;"
+          DB_HOST_CANDIDATES=("mysql" "127.0.0.1")
+          DB_PORT="${DB_PORT:-3306}"
+          ROOT_USER="root"
+          ROOT_PASS="0404"
+          DB_NAME="${DB_NAME:-gestion_turnos}"
+
+          SCHEMA_FILE=$(find . -name "*schema.sql" | head -n 1 || true)
+          DATA_FILE=$(find . -name "*data.sql" | head -n 1 || true)
+
+          if [ -z "$SCHEMA_FILE" ]; then
+            echo "Error: No se encontró ningun archivo schema.sql"
             exit 1
           fi
 
-      - name: Inicializar y preparar MySQL (crear usuario CI e importar schema/data)
-        run: |
-          SCHEMA_FILE=$(find . -name "*schema.sql" | head -n 1)
-          DATA_FILE=$(find . -name "*data.sql" | head -n 1)
+          MAX_ATTEMPTS=90
+          SLEEP_SECONDS=2
+          CONNECTED_HOST=""
 
-          if [ -z "$SCHEMA_FILE" ]; then
-            echo "Error: No se encontró schema.sql"
+          echo "Buscando conexión con MySQL..."
+          for attempt in $(seq 1 $MAX_ATTEMPTS); do
+            for host in "${DB_HOST_CANDIDATES[@]}"; do
+              if mysql -h"$host" -P"$DB_PORT" -u"$ROOT_USER" -p"$ROOT_PASS" -e "SELECT 1" >/dev/null 2>&1; then
+                CONNECTED_HOST="$host"
+                echo "¡Conectado exitosamente a MySQL usando host='$host' en el intento $attempt!"
+                break 2
+              fi
+            done
+            echo "Intento $attempt/$MAX_ATTEMPTS: Esperando a que MySQL responda..."
+            sleep $SLEEP_SECONDS
+          done
+
+          if [ -z "$CONNECTED_HOST" ]; then
+            echo "Error: MySQL no respondió a tiempo en ninguno de los hosts."
             exit 1
           fi
 
           CI_USER="ci_user"
           CI_PASS="ci_password_123"
 
-          echo "Creando usuario CI '$CI_USER'@'%' y asignando permisos..."
-          mysql -hmysql -P3306 -uroot -p"0404" -e "
+          echo "Creando base de datos y usuario CI '${CI_USER}'@'%'..."
+          mysql -h"$CONNECTED_HOST" -P"$DB_PORT" -u"$ROOT_USER" -p"$ROOT_PASS" -e "
+          CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\`;
           CREATE USER IF NOT EXISTS '${CI_USER}'@'%' IDENTIFIED BY '${CI_PASS}';
-          GRANT ALL PRIVILEGES ON gestion_turnos.* TO '${CI_USER}'@'%';
+          GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${CI_USER}'@'%';
           FLUSH PRIVILEGES;"
 
-          echo "Cargando schema desde: $SCHEMA_FILE"
-          mysql -hmysql -P3306 -u"${CI_USER}" -p"${CI_PASS}" gestion_turnos < "$SCHEMA_FILE"
+          echo "Importando schema desde: $SCHEMA_FILE"
+          mysql -h"$CONNECTED_HOST" -P"$DB_PORT" -u"$CI_USER" -p"$CI_PASS" "$DB_NAME" < "$SCHEMA_FILE"
 
           if [ -n "$DATA_FILE" ]; then
-            echo "Cargando data desde: $DATA_FILE"
-            mysql -hmysql -P3306 -u"${CI_USER}" -p"${CI_PASS}" gestion_turnos < "$DATA_FILE"
+            echo "Importando data desde: $DATA_FILE"
+            mysql -h"$CONNECTED_HOST" -P"$DB_PORT" -u"$CI_USER" -p"$CI_PASS" "$DB_NAME" < "$DATA_FILE"
           fi
 
       - name: Compilar y Ejecutar Tests
