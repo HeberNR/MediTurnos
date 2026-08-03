@@ -18,90 +18,106 @@ jobs:
           MYSQL_DATABASE: gestion_turnos
           MYSQL_ROOT_HOST: '%'
         ports:
-          - 3306:3306
-        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=5
+          - 3306/tcp
+        options: >-
+          --health-cmd="mysqladmin ping -proot --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=20
 
     env:
       DB_HOST: 127.0.0.1
-      DB_PORT: 3306
+      DB_PORT: ${{ job.services.mysql.ports['3306'] }}
       DB_NAME: gestion_turnos
       DB_USER: ci_user
       DB_PASSWORD: ci_password_123
 
     steps:
-      - name: Descargar el código
+      - name: Descargar código
         uses: actions/checkout@v3
 
       - name: Configurar Java 21
         uses: actions/setup-java@v3
         with:
-          java-version: '21'
-          distribution: 'temurin'
+          distribution: temurin
+          java-version: 21
           cache: maven
 
-      - name: Instalar cliente de MySQL
-        run: sudo apt-get update && sudo apt-get install -y default-mysql-client
-
-      - name: "Esperar y preparar MySQL (multi-host, usuario CI e importación)"
+      - name: Instalar cliente MySQL
         run: |
-          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y default-mysql-client netcat-openbsd
 
-          DB_HOST_CANDIDATES=("mysql" "127.0.0.1")
-          DB_PORT="${DB_PORT:-3306}"
-          ROOT_USER="root"
-          ROOT_PASS="0404"
-          DB_NAME="${DB_NAME:-gestion_turnos}"
+      - name: Ver estado de Docker
+        run: |
+          docker ps -a
+          docker logs $(docker ps -aq --filter ancestor=mysql:8.0.33) || true    
 
-          SCHEMA_FILE=$(find . -name "*schema.sql" | head -n 1 || true)
-          DATA_FILE=$(find . -name "*data.sql" | head -n 1 || true)
+      - name: Debug inicial
+        run: |
+          echo "HOST=$DB_HOST"
+          echo "PORT=$DB_PORT"
 
-          if [ -z "$SCHEMA_FILE" ]; then
-            echo "Error: No se encontró ningun archivo schema.sql"
-            exit 1
-          fi
+          echo "===== SQL encontrados ====="
+          find . -name "*.sql"
 
-          MAX_ATTEMPTS=90
-          SLEEP_SECONDS=2
-          CONNECTED_HOST=""
-
-          echo "Buscando conexión con MySQL..."
-          for attempt in $(seq 1 $MAX_ATTEMPTS); do
-            for host in "${DB_HOST_CANDIDATES[@]}"; do
-              if mysql -h"$host" -P"$DB_PORT" -u"$ROOT_USER" -p"$ROOT_PASS" -e "SELECT 1" >/dev/null 2>&1; then
-                CONNECTED_HOST="$host"
-                echo "¡Conectado exitosamente a MySQL usando host='$host' en el intento $attempt!"
-                break 2
-              fi
-            done
-            echo "Intento $attempt/$MAX_ATTEMPTS: Esperando a que MySQL responda..."
-            sleep $SLEEP_SECONDS
+          echo "===== Esperando puerto ====="
+          for i in {1..30}; do
+            nc -z "$DB_HOST" "$DB_PORT" && break
+            echo "Esperando puerto..."
+            sleep 2
           done
 
-          if [ -z "$CONNECTED_HOST" ]; then
-            echo "Error: MySQL no respondió a tiempo en ninguno de los hosts."
-            exit 1
-          fi
+      - name: Preparar Base de Datos
+        run: |
+          set -e
 
-          CI_USER="ci_user"
-          CI_PASS="ci_password_123"
+          ROOT_USER=root
+          ROOT_PASS=0404
 
-          echo "Creando base de datos y usuario CI '${CI_USER}'@'%'..."
-          mysql -h"$CONNECTED_HOST" -P"$DB_PORT" -u"$ROOT_USER" -p"$ROOT_PASS" -e "
-          CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\`;
-          CREATE USER IF NOT EXISTS '${CI_USER}'@'%' IDENTIFIED BY '${CI_PASS}';
-          GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${CI_USER}'@'%';
-          FLUSH PRIVILEGES;"
+          SCHEMA_FILE=$(find . -name "*schema.sql" | head -n 1)
+          DATA_FILE=$(find . -name "*data.sql" | head -n 1)
 
-          echo "Importando schema desde: $SCHEMA_FILE"
-          mysql -h"$CONNECTED_HOST" -P"$DB_PORT" -u"$CI_USER" -p"$CI_PASS" "$DB_NAME" < "$SCHEMA_FILE"
+          echo "Schema: $SCHEMA_FILE"
+          echo "Data: $DATA_FILE"
+
+          mysql \
+            -h"$DB_HOST" \
+            -P"$DB_PORT" \
+            -u"$ROOT_USER" \
+            -p"$ROOT_PASS" \
+            -e "SELECT VERSION();"
+
+          mysql \
+            -h"$DB_HOST" \
+            -P"$DB_PORT" \
+            -u"$ROOT_USER" \
+            -p"$ROOT_PASS" \
+            -e "
+              CREATE DATABASE IF NOT EXISTS ${DB_NAME};
+              CREATE USER IF NOT EXISTS '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASSWORD}';
+              GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'%';
+              FLUSH PRIVILEGES;
+            "
+
+          mysql \
+            -h"$DB_HOST" \
+            -P"$DB_PORT" \
+            -u"$DB_USER" \
+            -p"$DB_PASSWORD" \
+            "$DB_NAME" < "$SCHEMA_FILE"
 
           if [ -n "$DATA_FILE" ]; then
-            echo "Importando data desde: $DATA_FILE"
-            mysql -h"$CONNECTED_HOST" -P"$DB_PORT" -u"$CI_USER" -p"$CI_PASS" "$DB_NAME" < "$DATA_FILE"
+            mysql \
+              -h"$DB_HOST" \
+              -P"$DB_PORT" \
+              -u"$DB_USER" \
+              -p"$DB_PASSWORD" \
+              "$DB_NAME" < "$DATA_FILE"
           fi
 
-      - name: Compilar y Ejecutar Tests
+      - name: Ejecutar Tests
         run: mvn clean test
 
-      - name: Empaquetar el proyecto
+      - name: Empaquetar
         run: mvn package -DskipTests
