@@ -16,8 +16,7 @@ jobs:
         env:
           MYSQL_ROOT_PASSWORD: 0404
           MYSQL_DATABASE: gestion_turnos
-          MYSQL_USER: app_user
-          MYSQL_PASSWORD: 0404
+          MYSQL_ROOT_HOST: '%'
         ports:
           - 3306:3306
         options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=5
@@ -26,7 +25,7 @@ jobs:
       DB_HOST: 127.0.0.1
       DB_PORT: 3306
       DB_NAME: gestion_turnos
-      DB_USER: app_user
+      DB_USER: root
       DB_PASSWORD: 0404
 
     steps:
@@ -43,33 +42,43 @@ jobs:
       - name: Instalar cliente de MySQL
         run: sudo apt-get update && sudo apt-get install -y default-mysql-client
 
-      - name: Esperar a que MySQL esté listo
+      - name: Espera robusta a que MySQL acepte conexiones reales
         run: |
-          for i in {1..30}; do
-            if mysql -h127.0.0.1 -uapp_user -p0404 -e "SELECT 1" >/dev/null 2>&1; then
-              echo "MySQL is ready"
+          echo "Esperando a que MySQL esté completamente inicializado..."
+          for i in {1..60}; do
+            if mysql -h 127.0.0.1 -P 3306 -uroot -p"0404" -e "SELECT 1" >/dev/null 2>&1; then
+              echo "¡MySQL está listo y respondiendo!"
               break
             fi
-            echo "Waiting for MySQL..."
-            sleep 2
+            echo "Intento $i/60: MySQL todavía se está configurando internamente..."
+            sleep 3
           done
+          
+          # Verificación final por si agotó los intentos
+          if ! mysql -h 127.0.0.1 -P 3306 -uroot -p"0404" -e "SELECT 1" >/dev/null 2>&1; then
+            echo "Error: MySQL no respondió a tiempo."
+            exit 1
+          fi
 
-      - name: Inicializar tablas en MySQL con schema.sql
+      - name: Inicializar tablas en MySQL de forma segura
         run: |
           SCHEMA_FILE=$(find . -name "*schema.sql" | head -n 1)
           DATA_FILE=$(find . -name "*data.sql" | head -n 1)
 
-          if [ -n "$SCHEMA_FILE" ]; then
-            echo "Cargando schema desde: $SCHEMA_FILE"
-            mysql -h 127.0.0.1 -P 3306 -uapp_user -p0404 gestion_turnos < "$SCHEMA_FILE"
-          else
-            echo "Error: No se encontró el archivo schema"
+          if [ -z "$SCHEMA_FILE" ]; then
+            echo "Error: No se encontró ningún archivo schema.sql"
             exit 1
           fi
 
+          echo "Asegurando permisos remotos para root..."
+          mysql -h 127.0.0.1 -P 3306 -uroot -p"0404" -e "ALTER USER 'root'@'%' IDENTIFIED WITH mysql_native_password BY '0404'; GRANT ALL PRIVILEGES ON gestion_turnos.* TO 'root'@'%'; FLUSH PRIVILEGES;"
+
+          echo "Cargando schema desde: $SCHEMA_FILE"
+          mysql -h 127.0.0.1 -P 3306 -uroot -p"0404" gestion_turnos < "$SCHEMA_FILE"
+
           if [ -n "$DATA_FILE" ]; then
             echo "Cargando data desde: $DATA_FILE"
-            mysql -h 127.0.0.1 -P 3306 -uapp_user -p0404 gestion_turnos < "$DATA_FILE"
+            mysql -h 127.0.0.1 -P 3306 -uroot -p"0404" gestion_turnos < "$DATA_FILE"
           fi
 
       - name: Compilar y Ejecutar Tests
