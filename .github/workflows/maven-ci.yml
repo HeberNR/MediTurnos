@@ -18,29 +18,29 @@ jobs:
           MYSQL_DATABASE: gestion_turnos
           MYSQL_ROOT_HOST: '%'
         ports:
-          - 3306/tcp
+          - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping -proot --silent"
+          --health-cmd="mysqladmin ping -h localhost -uroot -p0404 --silent"
           --health-interval=10s
           --health-timeout=5s
-          --health-retries=20
+          --health-retries=30
 
     env:
       DB_HOST: 127.0.0.1
-      DB_PORT: ${{ job.services.mysql.ports['3306'] }}
+      DB_PORT: 3306
       DB_NAME: gestion_turnos
       DB_USER: ci_user
       DB_PASSWORD: ci_password_123
 
     steps:
-      - name: Descargar código
-        uses: actions/checkout@v3
+      - name: Descargar el código
+        uses: actions/checkout@v4
 
       - name: Configurar Java 21
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
+          java-version: '21'
           cache: maven
 
       - name: Instalar cliente MySQL
@@ -48,25 +48,50 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y default-mysql-client netcat-openbsd
 
-      - name: Ver estado de Docker
-        run: |
-          docker ps -a
-          docker logs $(docker ps -aq --filter ancestor=mysql:8.0.33) || true    
-
       - name: Debug inicial
         run: |
-          echo "HOST=$DB_HOST"
-          echo "PORT=$DB_PORT"
+          echo "===== Variables ====="
+          echo "DB_HOST=$DB_HOST"
+          echo "DB_PORT=$DB_PORT"
+          echo "DB_NAME=$DB_NAME"
 
+          echo ""
           echo "===== SQL encontrados ====="
           find . -name "*.sql"
 
-          echo "===== Esperando puerto ====="
-          for i in {1..30}; do
-            nc -z "$DB_HOST" "$DB_PORT" && break
-            echo "Esperando puerto..."
+          echo ""
+          echo "===== Docker ====="
+          docker ps -a || true
+
+      - name: Esperar MySQL
+        run: |
+          echo "Esperando a que MySQL abra el puerto..."
+
+          for i in {1..60}; do
+            if nc -z $DB_HOST $DB_PORT; then
+              echo "Puerto abierto."
+              exit 0
+            fi
+
+            echo "Intento $i/60..."
             sleep 2
           done
+
+          echo "MySQL nunca abrió el puerto."
+
+          echo ""
+          echo "===== Docker ====="
+          docker ps -a || true
+
+          echo ""
+          echo "===== Logs MySQL ====="
+          CONTAINER=$(docker ps -aq --filter ancestor=mysql:8.0.33)
+
+          if [ -n "$CONTAINER" ]; then
+            docker logs "$CONTAINER" || true
+          fi
+
+          exit 1
 
       - name: Preparar Base de Datos
         run: |
@@ -75,18 +100,16 @@ jobs:
           ROOT_USER=root
           ROOT_PASS=0404
 
-          SCHEMA_FILE=$(find . -name "*schema.sql" | head -n 1)
-          DATA_FILE=$(find . -name "*data.sql" | head -n 1)
+          SCHEMA_FILE=$(find . -name "*schema.sql" | head -n1)
+          DATA_FILE=$(find . -name "*data.sql" | head -n1)
 
-          echo "Schema: $SCHEMA_FILE"
-          echo "Data: $DATA_FILE"
+          echo "Schema encontrado: $SCHEMA_FILE"
+          echo "Data encontrada: $DATA_FILE"
 
-          mysql \
-            -h"$DB_HOST" \
-            -P"$DB_PORT" \
-            -u"$ROOT_USER" \
-            -p"$ROOT_PASS" \
-            -e "SELECT VERSION();"
+          if [ -z "$SCHEMA_FILE" ]; then
+            echo "No se encontró schema.sql"
+            exit 1
+          fi
 
           mysql \
             -h"$DB_HOST" \
@@ -119,5 +142,5 @@ jobs:
       - name: Ejecutar Tests
         run: mvn clean test
 
-      - name: Empaquetar
+      - name: Empaquetar proyecto
         run: mvn package -DskipTests
