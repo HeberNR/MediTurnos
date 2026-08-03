@@ -21,12 +21,13 @@ jobs:
           - 3306:3306
         options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=5
 
+    # Variables de entorno para la aplicación y los tests (usando el usuario CI dedicado)
     env:
       DB_HOST: 127.0.0.1
       DB_PORT: 3306
       DB_NAME: gestion_turnos
-      DB_USER: root
-      DB_PASSWORD: 0404
+      DB_USER: ci_user
+      DB_PASSWORD: ci_password_123
 
     steps:
       - name: Descargar el código
@@ -42,43 +43,49 @@ jobs:
       - name: Instalar cliente de MySQL
         run: sudo apt-get update && sudo apt-get install -y default-mysql-client
 
-      - name: Espera robusta a que MySQL acepte conexiones reales
+      - name: "Esperar a que MySQL esté listo (host: mysql)"
         run: |
-          echo "Esperando a que MySQL esté completamente inicializado..."
-          for i in {1..60}; do
-            if mysql -h 127.0.0.1 -P 3306 -uroot -p"0404" -e "SELECT 1" >/dev/null 2>&1; then
-              echo "¡MySQL está listo y respondiendo!"
+          for i in {1..90}; do
+            if mysql -hmysql -P3306 -uroot -p"0404" -e "SELECT 1" >/dev/null 2>&1; then
+              echo "MySQL está listo"
               break
             fi
-            echo "Intento $i/60: MySQL todavía se está configurando internamente..."
-            sleep 3
+            echo "Intento $i/90: MySQL todavía se está configurando internamente..."
+            sleep 2
           done
-          
-          # Verificación final por si agotó los intentos
-          if ! mysql -h 127.0.0.1 -P 3306 -uroot -p"0404" -e "SELECT 1" >/dev/null 2>&1; then
+
+          if ! mysql -hmysql -P3306 -uroot -p"0404" -e "SELECT 1" >/dev/null 2>&1; then
             echo "Error: MySQL no respondió a tiempo."
+            echo "== Estado mysql.user y versión =="
+            mysql -hmysql -P3306 -uroot -p"0404" -e "SELECT USER(), CURRENT_USER(), @@version; SELECT User, Host, plugin FROM mysql.user;"
             exit 1
           fi
 
-      - name: Inicializar tablas en MySQL de forma segura
+      - name: Inicializar y preparar MySQL (crear usuario CI e importar schema/data)
         run: |
           SCHEMA_FILE=$(find . -name "*schema.sql" | head -n 1)
           DATA_FILE=$(find . -name "*data.sql" | head -n 1)
 
           if [ -z "$SCHEMA_FILE" ]; then
-            echo "Error: No se encontró ningún archivo schema.sql"
+            echo "Error: No se encontró schema.sql"
             exit 1
           fi
 
-          echo "Asegurando permisos remotos para root..."
-          mysql -h 127.0.0.1 -P 3306 -uroot -p"0404" -e "ALTER USER 'root'@'%' IDENTIFIED WITH mysql_native_password BY '0404'; GRANT ALL PRIVILEGES ON gestion_turnos.* TO 'root'@'%'; FLUSH PRIVILEGES;"
+          CI_USER="ci_user"
+          CI_PASS="ci_password_123"
+
+          echo "Creando usuario CI '$CI_USER'@'%' y asignando permisos..."
+          mysql -hmysql -P3306 -uroot -p"0404" -e "
+          CREATE USER IF NOT EXISTS '${CI_USER}'@'%' IDENTIFIED BY '${CI_PASS}';
+          GRANT ALL PRIVILEGES ON gestion_turnos.* TO '${CI_USER}'@'%';
+          FLUSH PRIVILEGES;"
 
           echo "Cargando schema desde: $SCHEMA_FILE"
-          mysql -h 127.0.0.1 -P 3306 -uroot -p"0404" gestion_turnos < "$SCHEMA_FILE"
+          mysql -hmysql -P3306 -u"${CI_USER}" -p"${CI_PASS}" gestion_turnos < "$SCHEMA_FILE"
 
           if [ -n "$DATA_FILE" ]; then
             echo "Cargando data desde: $DATA_FILE"
-            mysql -h 127.0.0.1 -P 3306 -uroot -p"0404" gestion_turnos < "$DATA_FILE"
+            mysql -hmysql -P3306 -u"${CI_USER}" -p"${CI_PASS}" gestion_turnos < "$DATA_FILE"
           fi
 
       - name: Compilar y Ejecutar Tests
