@@ -54,8 +54,8 @@ jobs:
 
       - name: Inicializar tablas en MySQL con schema.sql
         run: |
-          SCHEMA_FILE=$(find . -name "schema.sql" | head -n 1)
-          DATA_FILE=$(find . -name "data.sql" | head -n 1)
+          SCHEMA_FILE=$(find . -name "01-schema.sql" | head -n 1)
+          DATA_FILE=$(find . -name "02-data.sql" | head -n 1)
 
           if [ -n "$SCHEMA_FILE" ]; then
             echo "Cargando schema desde: $SCHEMA_FILE"
