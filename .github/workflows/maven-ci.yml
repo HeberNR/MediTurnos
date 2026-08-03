@@ -33,9 +33,9 @@ jobs:
 
       - name: Inicializar tablas en MySQL
         run: |
-          mysql -h 127.0.0.1 -P 3306 -u root -p0404 gestion_turnos < src/main/resources/schema.sql
+          mysql -h 127.0.0.1 -P 3306 -u root -p0404 gestion_turnos < src/main/java/resources/schema.sql
           if [ -f src/main/resources/data.sql ]; then
-            mysql -h 127.0.0.1 -P 3306 -u root -p0404 gestion_turnos < src/main/resources/data.sql
+            mysql -h 127.0.0.1 -P 3306 -u root -p0404 gestion_turnos < src/main/java/resources/data.sql
           fi
 
       - name: Compilar y Ejecutar Tests
