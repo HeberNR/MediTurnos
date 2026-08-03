@@ -1,0 +1,39 @@
+name: Integración Continua (CI)
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    # Levantamos un MySQL temporal en GitHub para que los DAOTests pasen
+    services:
+      mysql:
+        image: mysql:8.0.33
+        env:
+          MYSQL_ROOT_PASSWORD: 0404
+          MYSQL_DATABASE: gestion_turnos # Ajustar a tu BD real
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v3
+
+      - name: Configurar Java 21
+        uses: actions/setup-java@v3
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Compilar y Ejecutar Tests
+        run: mvn clean test
+
+      - name: Empaquetar el proyecto
+        run: mvn package -DskipTests

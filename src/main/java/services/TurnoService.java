@@ -37,8 +37,28 @@ public class TurnoService {
     return turnoDAO.crear(nuevoTurno);
   }
 
+  /**
+   * Método adaptador que usa el AdminTurnosServlet para procesar los datos de tipo String
+   * que vienen del formulario web y derivarlos a la lógica de creación presencial.
+   */
+  public void agendarTurnoAdministrativo(int doctorId, String dni, String nombre, String apellido, String fechaStr, String horaStr, String motivo) {
+    if (fechaStr == null || fechaStr.isEmpty() || horaStr == null || horaStr.isEmpty()) {
+      throw new IllegalArgumentException("La fecha y la hora son obligatorias.");
+    }
+
+    Date fecha = Date.valueOf(fechaStr); // Convierte "YYYY-MM-DD" a java.sql.Date
+
+    // Aseguramos formato HH:mm:ss por si el input time manda solo HH:mm
+    if (horaStr.length() == 5) {
+      horaStr += ":00";
+    }
+    Time hora = Time.valueOf(horaStr); // Convierte "HH:mm:ss" a java.sql.Time
+
+    // Reutilizamos toda la lógica robusta de creación y manejo de pacientes presenciales
+    crearTurnoPresencial(dni, nombre, apellido, doctorId, fecha, hora, motivo);
+  }
+
   public void crearTurnoPresencial(String dniPaciente, String nombre, String apellido, int doctorId, Date fecha, Time hora, String motivo) {
-    // Ahora usa la instancia de la clase (this.usuarioDAO) en lugar de un 'new' local
     Optional<Usuario> pacienteOpt = usuarioDAO.buscarPorDni(dniPaciente);
     int pacienteId;
 

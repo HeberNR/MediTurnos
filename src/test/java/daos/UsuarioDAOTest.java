@@ -121,13 +121,13 @@ class UsuarioDAOTest {
   void listarDoctoresConEspecialidad_DebeRetornarListaDeDoctores() {
     // Creamos un doctor temporal para la prueba
     Usuario doctorPrueba = new Usuario();
-    doctorPrueba.setNombre("Gregory");
-    doctorPrueba.setApellido("House");
-    doctorPrueba.setDni("55443322");
-    doctorPrueba.setEmail("house@mediturnos.com");
-    doctorPrueba.setPassword("123");
+    doctorPrueba.setNombre("Doctor");
+    doctorPrueba.setApellido("Test Especialidad");
+    doctorPrueba.setDni("9988776655");
+    doctorPrueba.setEmail("doctor.especialidad.test@mediturnos.com");
+    doctorPrueba.setPassword("12345");
     doctorPrueba.setRol("doctor");
-    doctorPrueba.setEspecialidadNombre("Cardiología");
+    doctorPrueba.setEspecialidadNombre("Cardiologia");
     doctorPrueba.setActivo(true);
 
     Usuario creado = usuarioDAO.crear(doctorPrueba);

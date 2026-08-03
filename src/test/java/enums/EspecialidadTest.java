@@ -13,6 +13,6 @@ class EspecialidadTest {
 
     // Probamos valueOf() y el getter
     Especialidad esp = Especialidad.valueOf("CARDIOLOGIA");
-    assertEquals("Cardiología", esp.getNombre());
+    assertEquals("Cardiologia", esp.getNombre());
   }
 }

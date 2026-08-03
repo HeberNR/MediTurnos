@@ -1,17 +1,17 @@
 package enums;
 
 public enum Especialidad {
-  MEDICO_GENERAL("Médico General / Guardia"),
-  CARDIOLOGIA("Cardiología"),
-  PEDIATRIA("Pediatría"),
-  CLINICA_MEDICA("Clínica Médica"),
-  DERMATOLOGIA("Dermatología"),
-  TRAUMATOLOGIA("Traumatología"),
-  OFTALMOLOGIA("Oftalmología"),
-  ODONTOLOGIA("Odontología"),
-  GINECOLOGIA("Ginecología"),
-  PSIQUIATRIA("Psiquiatría"),
-  NEUROLOGIA("Neurología");
+  MEDICO_GENERAL("Medico General / Guardia"),
+  CARDIOLOGIA("Cardiologia"),
+  PEDIATRIA("Pediatria"),
+  CLINICA_MEDICA("Clinica Medica"),
+  DERMATOLOGIA("Dermatologia"),
+  TRAUMATOLOGIA("Traumatologia"),
+  OFTALMOLOGIA("Oftalmologia"),
+  ODONTOLOGIA("Odontologia"),
+  GINECOLOGIA("Ginecologia"),
+  PSIQUIATRIA("Psiquiatria"),
+  NEUROLOGIA("Neurologia");
 
   private final String nombre;
 

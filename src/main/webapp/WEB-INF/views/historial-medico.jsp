@@ -1,29 +1,37 @@
-<%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" language="java" %>
 <%@ page import="java.util.List" %>
 <%@ page import="models.Turno" %>
 
+<%-- Incluimos el header global --%>
 <jsp:include page="../components/header.jsp" />
 
-<div style="max-width: 1100px; margin: 2rem auto; padding: 0 1rem; width: 100%;">
-  <div class="card" style="max-width: 100%;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-      <h2 style="margin: 0; text-align: left;">Historial Clínico de Pacientes</h2>
+<%-- Contenedor de ancho grande (1100px) --%>
+<div class="container-large">
+
+  <%-- Tarjeta grande que ocupa todo el ancho del contenedor --%>
+  <div class="card card-large">
+
+    <%-- Cabecera con título alineado a la izquierda y botón de retorno a la derecha --%>
+    <div class="card-header">
+      <h2>Historial Clínico de Pacientes</h2>
       <a href="<%= request.getContextPath() %>/dashboard" class="btn btn-outline">Volver al Panel</a>
     </div>
 
-    <p style="color: var(--text-secondary); margin-bottom: 2rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+    <%-- Subtítulo descriptivo con línea divisoria --%>
+    <p class="card-subtitle">
       Acá podés revisar todas las consultas finalizadas, los diagnósticos y las observaciones de tus pacientes.
     </p>
 
-    <div style="overflow-x: auto;">
-      <table style="width: 100%; border-collapse: collapse; text-align: left;">
+    <%-- Contenedor con scroll horizontal para tablas responsivas --%>
+    <div class="table-container">
+      <table class="table">
         <thead>
-        <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-secondary);">
-          <th style="padding: 1rem;">Fecha</th>
-          <th style="padding: 1rem;">Paciente</th>
-          <th style="padding: 1rem;">Motivo Inicial</th>
-          <th style="padding: 1rem;">Diagnóstico Médico</th>
-          <th style="padding: 1rem;">Observaciones</th>
+        <tr>
+          <th>Fecha</th>
+          <th>Paciente</th>
+          <th>Motivo Inicial</th>
+          <th>Diagnóstico Médico</th>
+          <th>Observaciones</th>
         </tr>
         </thead>
         <tbody>
@@ -32,22 +40,23 @@
           if (historial != null && !historial.isEmpty()) {
           for (Turno t : historial) {
           %>
-          <tr style="border-bottom: 1px solid var(--border-color); vertical-align: top;">
-            <td style="padding: 1rem; white-space: nowrap;">
+          <tr>
+            <td style="white-space: nowrap;">
               <strong><%= t.getFechaTurno() %></strong><br>
-              <span style="color: var(--text-secondary); font-size: 0.85rem;"><%= t.getHoraTurno() %></span>
+              <span class="text-secondary text-small"><%= t.getHoraTurno() %></span>
             </td>
-            <td style="padding: 1rem;">
+            <td>
               <strong><%= t.getPacienteNombreCompleto() %></strong><br>
-              <span style="color: var(--text-secondary); font-size: 0.85rem;">DNI: <%= t.getPacienteDni() %></span>
+              <span class="text-secondary text-small">DNI: <%= t.getPacienteDni() %></span>
             </td>
-            <td style="padding: 1rem; color: var(--text-secondary); max-width: 150px;">
+            <td class="text-secondary" style="max-width: 150px;">
               <%= t.getMotivoConsulta() != null ? t.getMotivoConsulta() : "-" %>
             </td>
-            <td style="padding: 1rem; color: var(--success-text); font-weight: 500; max-width: 200px;">
+            <%-- Usamos variables de texto de éxito para los diagnósticos médicos --%>
+            <td style="color: var(--success-text); font-weight: 500; max-width: 200px;">
               <%= t.getDiagnostico() != null ? t.getDiagnostico() : "Sin diagnóstico" %>
             </td>
-            <td style="padding: 1rem; font-size: 0.9rem; max-width: 250px;">
+            <td class="text-small" style="max-width: 250px;">
               <%= t.getObservaciones() != null && !t.getObservaciones().trim().isEmpty() ? t.getObservaciones() : "-" %>
             </td>
           </tr>
@@ -56,7 +65,9 @@
           } else {
           %>
           <tr>
-            <td colspan="5" style="padding: 2rem; text-align: center; color: var(--text-secondary);">Aún no tenés consultas médicas finalizadas en tu historial.</td>
+            <td colspan="5" style="padding: 2rem; text-align: center;" class="text-secondary">
+              Aún no tenés consultas médicas finalizadas en tu historial.
+            </td>
           </tr>
           <% } %>
         </tbody>
@@ -65,4 +76,5 @@
   </div>
 </div>
 
+<%-- Incluimos el footer global --%>
 <jsp:include page="../components/footer.jsp" />

@@ -1,7 +1,5 @@
--- Borramos la base y la creamos totalmente limpia
-DROP DATABASE IF EXISTS gestion_turnos;
-CREATE DATABASE gestion_turnos CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE gestion_turnos;
+SET NAMES utf8mb4;
 
 -- 1. Tabla Unificada de Usuarios (Ahora incluye la especialidad como texto)
 CREATE TABLE usuarios (

@@ -1,30 +1,41 @@
-<%@ page contentType="text/html;charset=UTF-8" language="java" %>
-<%@ page import="enums.Especialidad" %> <!-- IMPORTAMOS EL ENUM -->
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" language="java" %>
+<%@ page import="enums.Especialidad" %>
 
+<%-- Incluimos el header global[cite: 1] --%>
 <jsp:include page="../components/header.jsp" />
 
-<div class="card" style="max-width: 500px; margin: 2rem auto;">
+<%-- Tarjeta de registro con ancho máximo extendido a 500px para acomodar mejor los campos --%>
+<div class="card" style="max-width: 500px;">
   <h2>Registro de Usuario</h2>
 
+  <%-- Alerta de error en caso de que falle el registro[cite: 1] --%>
   <% if (request.getAttribute("error") != null) { %>
   <div class="alert alert-error"><%= request.getAttribute("error") %></div>
   <% } %>
 
+  <%-- Formulario de registro que envía los datos mediante POST hacia la ruta /registro[cite: 1] --%>
   <form action="<%= request.getContextPath() %>/registro" method="post">
 
+    <%-- Selector de Tipo de Usuario[cite: 1] --%>
     <div class="input-group">
       <label for="rol">Tipo de Usuario</label>
-      <select id="rol" name="rol" onchange="toggleEspecialidad()" required style="padding: 0.8rem; border: 1px solid var(--border-color); border-radius: 6px; background-color: var(--bg-color); color: var(--text-primary);">
+      <%-- El select hereda automáticamente los estilos globales de .input-group select --%>
+      <select id="rol" name="rol" onchange="toggleEspecialidad()" required>
         <option value="paciente">Paciente</option>
         <option value="doctor">Doctor</option>
         <option value="admin">Administrador</option>
       </select>
     </div>
 
-    <!-- CAMPO ESPECIALIDAD (Solo visible si es doctor gracias a JS) -->
+    <%--
+    CAMPO DE ESPECIALIDAD MÉDICA[cite: 1]
+    Por defecto está oculto (display: none). Se muestra dinámicamente mediante JavaScript
+    si el usuario selecciona el rol de "Doctor".
+    --%>
     <div class="input-group" id="grupoEspecialidad" style="display: none;">
       <label for="especialidad">Especialidad Médica</label>
-      <select id="especialidad" name="especialidad" style="padding: 0.8rem; border: 1px solid var(--border-color); border-radius: 6px; background-color: var(--bg-color); color: var(--text-primary);">
+      <select id="especialidad" name="especialidad">
+        <%-- Iteramos sobre los valores del Enum Especialidad[cite: 1] --%>
         <% for (Especialidad esp : Especialidad.values()) { %>
         <option value="<%= esp.getNombre() %>"><%= esp.getNombre() %></option>
         <% } %>
@@ -61,15 +72,18 @@
       <input type="text" id="telefono" name="telefono">
     </div>
 
-    <button type="submit" class="btn" style="width: 100%; margin-top: 1rem;">Registrarse</button>
+    <%-- Botón de envío con ancho completo y utilidad de margen superior[cite: 1] --%>
+    <button type="submit" class="btn mt-1" style="width: 100%;">Registrarse</button>
   </form>
 </div>
 
+<%-- Script de JavaScript para controlar la interactividad del formulario[cite: 1] --%>
 <script>
     function toggleEspecialidad() {
         const rol = document.getElementById("rol").value;
         const grupo = document.getElementById("grupoEspecialidad");
-        // Muestra el selector de especialidad solo si el rol es doctor
+
+        // Muestra el selector de especialidad solo si el rol seleccionado es doctor
         if (rol === "doctor") {
             grupo.style.display = "block";
         } else {
@@ -78,4 +92,5 @@
     }
 </script>
 
+<%-- Incluimos el footer global[cite: 1] --%>
 <jsp:include page="../components/footer.jsp" />
