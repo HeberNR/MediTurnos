@@ -42,6 +42,7 @@ CREATE TABLE auditoria_turnos (
 );
 
 -- 4. TRIGGER: Registra el cambio de estado automáticamente
+/*
 DELIMITER //
 CREATE TRIGGER trg_auditoria_estado_turno
     AFTER UPDATE ON turnos
@@ -53,7 +54,7 @@ BEGIN
 END IF;
 END; //
 DELIMITER ;
-
+*/
 -- 5. Vista Definitiva para listar los turnos
 CREATE VIEW vista_turnos_detallados AS
 SELECT
