@@ -2,9 +2,9 @@ name: Integración Continua (CI)
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: ["main", "master"]
   pull_request:
-    branches: [ "main", "master" ]
+    branches: ["main", "master"]
 
 jobs:
   build-and-test:
@@ -16,11 +16,12 @@ jobs:
         env:
           MYSQL_ROOT_PASSWORD: 0404
           MYSQL_DATABASE: gestion_turnos
-          MYSQL_ROOT_HOST: '%'
+          MYSQL_USER: ci_user
+          MYSQL_PASSWORD: ci_password_123
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping -h localhost -uroot -p0404 --silent"
+          --health-cmd="mysqladmin ping -h localhost -uci_user -pci_password_123 --silent"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=30
@@ -46,30 +47,21 @@ jobs:
       - name: Instalar cliente MySQL
         run: |
           sudo apt-get update
-          sudo apt-get install -y default-mysql-client netcat-openbsd
-
-      - name: Debug inicial
-        run: |
-          echo "===== Variables ====="
-          echo "DB_HOST=$DB_HOST"
-          echo "DB_PORT=$DB_PORT"
-          echo "DB_NAME=$DB_NAME"
-
-          echo ""
-          echo "===== SQL encontrados ====="
-          find . -name "*.sql"
-
-          echo ""
-          echo "===== Docker ====="
-          docker ps -a || true
+          sudo apt-get install -y default-mysql-client
 
       - name: Esperar MySQL
         run: |
-          echo "Esperando a que MySQL abra el puerto..."
+          echo "Esperando MySQL..."
 
           for i in {1..60}; do
-            if nc -z $DB_HOST $DB_PORT; then
-              echo "Puerto abierto."
+            if mysql \
+              -h"$DB_HOST" \
+              -P"$DB_PORT" \
+              -u"$DB_USER" \
+              -p"$DB_PASSWORD" \
+              -e "SELECT 1;" >/dev/null 2>&1; then
+
+              echo "MySQL listo."
               exit 0
             fi
 
@@ -77,51 +69,20 @@ jobs:
             sleep 2
           done
 
-          echo "MySQL nunca abrió el puerto."
-
-          echo ""
-          echo "===== Docker ====="
-          docker ps -a || true
-
-          echo ""
-          echo "===== Logs MySQL ====="
-          CONTAINER=$(docker ps -aq --filter ancestor=mysql:8.0.33)
-
-          if [ -n "$CONTAINER" ]; then
-            docker logs "$CONTAINER" || true
-          fi
-
+          echo "MySQL no respondió."
           exit 1
 
-      - name: Preparar Base de Datos
+      - name: Importar Base de Datos
         run: |
           set -e
-
-          ROOT_USER=root
-          ROOT_PASS=0404
 
           SCHEMA_FILE=$(find . -name "*schema.sql" | head -n1)
           DATA_FILE=$(find . -name "*data.sql" | head -n1)
 
-          echo "Schema encontrado: $SCHEMA_FILE"
-          echo "Data encontrada: $DATA_FILE"
+          echo "Schema: $SCHEMA_FILE"
+          echo "Data: $DATA_FILE"
 
-          if [ -z "$SCHEMA_FILE" ]; then
-            echo "No se encontró schema.sql"
-            exit 1
-          fi
-
-          mysql \
-            -h"$DB_HOST" \
-            -P"$DB_PORT" \
-            -u"$ROOT_USER" \
-            -p"$ROOT_PASS" \
-            -e "
-              CREATE DATABASE IF NOT EXISTS ${DB_NAME};
-              CREATE USER IF NOT EXISTS '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASSWORD}';
-              GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'%';
-              FLUSH PRIVILEGES;
-            "
+          test -f "$SCHEMA_FILE"
 
           mysql \
             -h"$DB_HOST" \
@@ -139,8 +100,8 @@ jobs:
               "$DB_NAME" < "$DATA_FILE"
           fi
 
-      - name: Ejecutar Tests
+      - name: Ejecutar tests
         run: mvn clean test
 
-      - name: Empaquetar proyecto
+      - name: Empaquetar
         run: mvn package -DskipTests
