@@ -20,6 +20,14 @@ jobs:
           - 3306:3306
         options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
 
+    # Variables de entorno para que la app se conecte al MySQL de GitHub Actions en el puerto 3306
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_NAME: gestion_turnos
+      DB_USER: root
+      DB_PASSWORD: 0404
+
     steps:
       - name: Descargar el código
         uses: actions/checkout@v3
@@ -31,20 +39,22 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      - name: Esperar a que MySQL esté listo
+        run: |
+          for i in {1..30}; do
+            mysqladmin ping -h127.0.0.1 -P3306 -uroot -p0404 --silent && break || sleep 2
+          done
+
       - name: Inicializar tablas en MySQL
         run: |
           SCHEMA_FILE=$(find . -name "schema.sql" | head -n 1)
           DATA_FILE=$(find . -name "data.sql" | head -n 1)
 
           if [ -n "$SCHEMA_FILE" ]; then
-            echo "Encontrado schema en: $SCHEMA_FILE"
             mysql -h 127.0.0.1 -P 3306 -u root -p0404 gestion_turnos < "$SCHEMA_FILE"
-          else
-            echo "Aviso: No se encontró schema.sql"
           fi
 
           if [ -n "$DATA_FILE" ]; then
-            echo "Encontrado data en: $DATA_FILE"
             mysql -h 127.0.0.1 -P 3306 -u root -p0404 gestion_turnos < "$DATA_FILE"
           fi
 
