@@ -33,9 +33,19 @@ jobs:
 
       - name: Inicializar tablas en MySQL
         run: |
-          mysql -h 127.0.0.1 -P 3306 -u root -p0404 gestion_turnos < src/main/java/resources/schema.sql
-          if [ -f src/main/resources/data.sql ]; then
-            mysql -h 127.0.0.1 -P 3306 -u root -p0404 gestion_turnos < src/main/java/resources/data.sql
+          SCHEMA_FILE=$(find . -name "schema.sql" | head -n 1)
+          DATA_FILE=$(find . -name "data.sql" | head -n 1)
+
+          if [ -n "$SCHEMA_FILE" ]; then
+            echo "Encontrado schema en: $SCHEMA_FILE"
+            mysql -h 127.0.0.1 -P 3306 -u root -p0404 gestion_turnos < "$SCHEMA_FILE"
+          else
+            echo "Aviso: No se encontró schema.sql"
+          fi
+
+          if [ -n "$DATA_FILE" ]; then
+            echo "Encontrado data en: $DATA_FILE"
+            mysql -h 127.0.0.1 -P 3306 -u root -p0404 gestion_turnos < "$DATA_FILE"
           fi
 
       - name: Compilar y Ejecutar Tests
