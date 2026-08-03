@@ -10,13 +10,12 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
-    # Levantamos un MySQL temporal en GitHub para que los DAOTests pasen
     services:
       mysql:
         image: mysql:8.0.33
         env:
           MYSQL_ROOT_PASSWORD: 0404
-          MYSQL_DATABASE: gestion_turnos # Ajustar a tu BD real
+          MYSQL_DATABASE: gestion_turnos
         ports:
           - 3306:3306
         options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
@@ -31,6 +30,13 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: maven
+
+      - name: Inicializar tablas en MySQL
+        run: |
+          mysql -h 127.0.0.1 -P 3306 -u root -p0404 gestion_turnos < src/main/resources/schema.sql
+          if [ -f src/main/resources/data.sql ]; then
+            mysql -h 127.0.0.1 -P 3306 -u root -p0404 gestion_turnos < src/main/resources/data.sql
+          fi
 
       - name: Compilar y Ejecutar Tests
         run: mvn clean test
